@@ -1,31 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from "recharts";
-import { 
-  Search,
-  Heart,
-  BarChart2,
-  PieChart,
-  AlertCircle
-} from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Search, Heart, BarChart2, PieChart, AlertCircle } from "lucide-react";
 
 // Define data types
 interface EmotionData {
@@ -41,26 +22,59 @@ interface SentimentData {
 const Dashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [emotionData, setEmotionData] = useState<EmotionData[]>([]);
+  const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
+  const [loveScore, setLoveScore] = useState<number>(0);
+  const [keyInsights, setKeyInsights] = useState<{ positive: string; negative: string }>({
+    positive: "",
+    negative: "",
+  });
 
-  // Sample data - in production, this would come from an API
-  const emotionData: EmotionData[] = [
-    { name: "Gratitude", value: 40 },
-    { name: "Optimism", value: 30 },
-    { name: "Love", value: 15 },
-    { name: "Disapproval", value: 10 },
-    { name: "Other", value: 5 }
-  ];
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
 
-  const sentimentData: SentimentData[] = [
-    { name: "Positive", value: 65 },
-    { name: "Neutral", value: 25 },
-    { name: "Negative", value: 10 }
-  ];
-
-  const handleSearch = (): void => {
     setIsLoading(true);
-    // API call would go here
-    setTimeout(() => setIsLoading(false), 2000);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: searchQuery }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setEmotionData([
+          { name: "Gratitude", value: data.emotions.Gratitude || 0 },
+          { name: "Optimism", value: data.emotions.Optimism || 0 },
+          { name: "Love", value: data.emotions.Love || 0 },
+          { name: "Disapproval", value: data.emotions.Disapproval || 0 },
+          { name: "Other", value: data.emotions.Other || 0 },
+        ]);
+
+        setSentimentData([
+          { name: "Positive", value: data.sentiment.Positive || 0 },
+          { name: "Neutral", value: data.sentiment.Neutral || 0 },
+          { name: "Negative", value: data.sentiment.Negative || 0 },
+        ]);
+
+        // Set Love Score
+        setLoveScore(data.emotions.Love || 0);
+
+        // Set Key Insights
+        setKeyInsights({
+          positive: data.insights.positive || "No positive feedback found.",
+          negative: data.insights.negative || "No negative feedback found.",
+        });
+      } else {
+        alert(data.error || "Failed to fetch data.");
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+
+    setIsLoading(false);
   };
 
   return (
@@ -69,21 +83,19 @@ const Dashboard: React.FC = () => {
       <div className="max-w-4xl mx-auto mb-8">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">
-              Entity Sentiment Analysis
-            </CardTitle>
+            <CardTitle className="text-2xl font-bold">Entity Sentiment Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
               <Input
-                placeholder="Enter company or person name..."
+                placeholder="Enter company name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1"
               />
               <Button onClick={handleSearch} disabled={isLoading}>
                 <Search className="mr-2 h-4 w-4" />
-                Analyze
+                {isLoading ? "Analyzing..." : "Analyze"}
               </Button>
             </div>
           </CardContent>
@@ -102,8 +114,8 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <div className="text-6xl font-bold text-red-500 mb-4">85</div>
-              <Progress value={85} className="h-4" />
+              <div className="text-6xl font-bold text-red-500 mb-4">{loveScore}</div>
+              <Progress value={loveScore} className="h-4" />
             </div>
           </CardContent>
         </Card>
@@ -163,16 +175,14 @@ const Dashboard: React.FC = () => {
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="font-semibold text-green-700">Positive Mention</div>
                 <p className="text-green-600">
-                  &quot;Outstanding customer service and innovative solutions...&quot;
-                </p> 
-                {/* ✅ FIXED: Escaped double quotes using `&quot;` */}
+                  {keyInsights.positive}
+                </p>
               </div>
               <div className="p-4 bg-red-50 rounded-lg border border-red-200">
                 <div className="font-semibold text-red-700">Area for Improvement</div>
                 <p className="text-red-600">
-                  &quot;Response times could be faster...&quot;
+                  {keyInsights.negative}
                 </p>
-                {/* ✅ FIXED: Escaped double quotes using `&quot;` */}
               </div>
             </div>
           </CardContent>
